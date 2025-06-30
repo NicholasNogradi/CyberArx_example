@@ -1,0 +1,130 @@
+name: Clean OpenAPI Specs
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+      
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+  
+
+jobs:
+  clean-specs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm install -g @redocly/cli
+        # Install yq for YAML parsing
+        sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        sudo chmod +x /usr/local/bin/yq
+      
+    - name: Create Redocly config
+      run: |
+        cat > redocly.yaml << EOF
+        apis:
+          main:
+            root: ./openapi.yaml
+        decorators:
+          remove-x-internal:
+            remove-x-internal: true
+        EOF
+        
+    - name: Create output directory
+      run: mkdir -p ./cleaned-specs
+        
+    - name: Clean OpenAPI specs (remove x-internal)
+      run: |
+        # Find OpenAPI spec files (exclude node_modules and common non-spec directories)
+        find . -path "*/node_modules" -prune -o -path "*/.git" -prune -o \
+          \( -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) -print | \
+          grep -E "(openapi|swagger|api)" | \
+          while read file; do
+            echo "Checking $file for OpenAPI specification..."
+            # Check if file contains OpenAPI/Swagger indicators
+            if grep -q -E "(openapi:|swagger:|\"openapi\":|\"swagger\":)" "$file" 2>/dev/null; then
+              echo "Processing OpenAPI spec: $file"
+              filename=$(basename "$file")
+              redocly bundle "$file" --output "./cleaned-specs/$filename" --config redocly.yaml
+            else
+              echo "Skipping $file (not an OpenAPI specification)"
+            fi
+          done
+        
+    # - name: Validate cleaned specs
+    #   run: |
+    #     find ./cleaned-specs -name "*.yaml" -o -name "*.yml" -o -name "*.json" | while read file; do
+    #       echo "Validating $file"
+    #       redocly lint "$file"
+    #     done
+        
+    - name: Publish to SwaggerHub
+      env:
+        SWAGGERHUB_API_KEY: ${{ secrets.SWAGGERHUB_API_KEY }}
+        SWAGGERHUB_OWNER: ${{ vars.SWAGGERHUB_OWNER }}
+      run: |
+        if [ -z "$SWAGGERHUB_API_KEY" ] || [ -z "$SWAGGERHUB_OWNER" ]; then
+          echo "Error: SWAGGERHUB_API_KEY secret and SWAGGERHUB_OWNER variable must be set"
+          exit 1
+        fi
+        
+        api_name="CyberArk_example"  # Fixed API name
+        
+        find ./cleaned-specs -name "*.yaml" -o -name "*.yml" -o -name "*.json" | while read file; do
+          echo "Publishing $file to SwaggerHub..."
+
+          if [[ "$file" == *.json ]]; then
+            base_version=$(jq -r '.info.version // "1.0.0"' "$file")
+          else
+            base_version=$(yq eval '.info.version // "1.0.0"' "$file")
+          fi
+          
+          version="${base_version}-public"
+
+          echo "Using API Name: $api_name, Version: $version"
+
+          curl -X POST \
+            "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name?version=$version" \
+            -H "Authorization: $SWAGGERHUB_API_KEY" \
+            -H "Content-Type: application/yaml" \
+            -H "Accept: application/json" \
+            --data-binary "@$file" \
+            --fail-with-body
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Successfully uploaded $api_name v$version to SwaggerHub"
+
+            curl -X PUT \
+              "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name/$version/settings/lifecycle" \
+              -H "Authorization: $SWAGGERHUB_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"published": true, "visibility": "public"}' \
+              --fail-with-body
+
+            if [ $? -eq 0 ]; then
+              echo "✅ Successfully published version $version"
+            else
+              echo "⚠️ Uploaded but failed to publish $version"
+            fi
+          else
+            echo "❌ Failed to upload version $version of $api_name"
+          fi
+
+          echo "---"
+        done
