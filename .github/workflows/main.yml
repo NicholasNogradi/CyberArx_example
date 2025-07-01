@@ -2,13 +2,13 @@ name: Clean OpenAPI Specs
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ swaggerhub ]
     paths:
       - '**/*.yaml'
       - '**/*.yml'
       
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - '**/*.yaml'
       - '**/*.yml'
@@ -85,6 +85,7 @@ jobs:
         fi
         
         api_name="CyberArk_example"  # Fixed API name
+
         
         find ./cleaned-specs -name "*.yaml" -o -name "*.yml" -o -name "*.json" | while read file; do
           echo "Publishing $file to SwaggerHub..."
@@ -97,8 +98,16 @@ jobs:
           
           version="${base_version}-public"
 
-          echo "Using API Name: $api_name, Version: $version"
+          echo "Unpublishing API Name: $api_name, Version: $version"
+           curl -X PUT \
+              "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name/$version/settings/lifecycle" \
+              -H "Authorization: $SWAGGERHUB_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"published": true, "visibility": "public"}' \
+              --fail-with-body
 
+          echo "Using API Name: $api_name, Version: $version"
+          
           curl -X POST \
             "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name?version=$version" \
             -H "Authorization: $SWAGGERHUB_API_KEY" \
