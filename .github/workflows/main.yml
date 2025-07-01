@@ -2,7 +2,7 @@ name: Clean OpenAPI Specs
 
 on:
   push:
-    branches: [ swaggerhub ]
+    branches: [ main, develop, swaggerhub ]
     paths:
       - '**/*.yaml'
       - '**/*.yml'
