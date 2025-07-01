@@ -71,7 +71,7 @@ jobs:
     #   run: |
     #     find ./cleaned-specs -name "*.yaml" -o -name "*.yml" -o -name "*.json" | while read file; do
     #       echo "Validating $file"
-    #       redocly lint "$file"
+    #       ** Lint with standardization rules configured**
     #     done
         
     - name: Publish to SwaggerHub
