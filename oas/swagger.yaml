@@ -87,6 +87,28 @@ paths:
         "409":
           description: an existing item already exists
       x-internal: true
+  /inventory/{id}:
+    get:
+      tags:
+      - admins
+      summary: Your GET endpoint
+      operationId: get-inventory-id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "200":
+          description: Success
+      x-internal: true
 components:
   schemas:
     InventoryItem:
