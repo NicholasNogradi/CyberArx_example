@@ -106,15 +106,15 @@ jobs:
               -d '{"published": true, "visibility": "public"}' \
               --fail-with-body
 
-          echo "Using API Name: $api_name, Version: $version"
+          # echo "Using API Name: $api_name, Version: $version"
           
-          curl -X POST \
-            "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name?version=$version" \
-            -H "Authorization: $SWAGGERHUB_API_KEY" \
-            -H "Content-Type: application/yaml" \
-            -H "Accept: application/json" \
-            --data-binary "@$file" \
-            --fail-with-body
+          # curl -X POST \
+          #   "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name?version=$version" \
+          #   -H "Authorization: $SWAGGERHUB_API_KEY" \
+          #   -H "Content-Type: application/yaml" \
+          #   -H "Accept: application/json" \
+          #   --data-binary "@$file" \
+          #   --fail-with-body
 
           if [ $? -eq 0 ]; then
             echo "✅ Successfully uploaded $api_name v$version to SwaggerHub"
