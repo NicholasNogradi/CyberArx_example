@@ -80,60 +80,67 @@ jobs:
         SWAGGERHUB_OWNER: ${{ vars.SWAGGERHUB_OWNER }}
       run: |
         if [ -z "$SWAGGERHUB_API_KEY" ] || [ -z "$SWAGGERHUB_OWNER" ]; then
-          echo "Error: SWAGGERHUB_API_KEY secret and SWAGGERHUB_OWNER variable must be set"
+          echo "SWAGGERHUB_API_KEY or SWAGGERHUB_OWNER not set."
           exit 1
         fi
-        
-        api_name="CyberArk_example"  # Fixed API name
 
-        
+        api_name="CyberArk_example"  # Change if needed
+
         find ./cleaned-specs -name "*.yaml" -o -name "*.yml" -o -name "*.json" | while read file; do
-          echo "Publishing $file to SwaggerHub..."
-
+          echo "🔍 Processing $file..."
           if [[ "$file" == *.json ]]; then
             base_version=$(jq -r '.info.version // "1.0.0"' "$file")
           else
             base_version=$(yq eval '.info.version // "1.0.0"' "$file")
           fi
-          
           version="${base_version}-public"
 
-          echo "Unpublishing API Name: $api_name, Version: $version"
-           curl -X PUT \
+          echo "Checking publish status for $api_name version $version..."
+          lifecycle_response=$(curl -s -H "Authorization: $SWAGGERHUB_API_KEY" \
+            "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name/$version/settings/lifecycle")
+
+          is_published=$(echo "$lifecycle_response" | jq -r '.published')
+
+          if [ "$is_published" == "true" ]; then
+            echo "🔧 Unpublishing $api_name version $version..."
+            curl -X PUT \
+              "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name/$version/settings/lifecycle" \
+              -H "Authorization: $SWAGGERHUB_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"published": false}' \
+              --fail-with-body
+          else
+            echo "ℹ️ $api_name version $version is not currently published"
+          fi
+
+          echo "⬆Uploading updated spec..."
+          curl -X POST \
+            "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name?version=$version&force=true" \
+            -H "Authorization: $SWAGGERHUB_API_KEY" \
+            -H "Content-Type: application/yaml" \
+            -H "Accept: application/json" \
+            --data-binary "@$file" \
+            --fail-with-body
+
+          if [ $? -eq 0 ]; then
+            echo "Successfully uploaded $api_name v$version"
+
+            echo "Republishing $api_name version $version..."
+            curl -X PUT \
               "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name/$version/settings/lifecycle" \
               -H "Authorization: $SWAGGERHUB_API_KEY" \
               -H "Content-Type: application/json" \
               -d '{"published": true, "visibility": "public"}' \
               --fail-with-body
 
-          # echo "Using API Name: $api_name, Version: $version"
-          
-          # curl -X POST \
-          #   "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name?version=$version" \
-          #   -H "Authorization: $SWAGGERHUB_API_KEY" \
-          #   -H "Content-Type: application/yaml" \
-          #   -H "Accept: application/json" \
-          #   --data-binary "@$file" \
-          #   --fail-with-body
-
-          if [ $? -eq 0 ]; then
-            echo "✅ Successfully uploaded $api_name v$version to SwaggerHub"
-
-            # curl -X PUT \
-            #   "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name/$version/settings/lifecycle" \
-            #   -H "Authorization: $SWAGGERHUB_API_KEY" \
-            #   -H "Content-Type: application/json" \
-            #   -d '{"published": true, "visibility": "public"}' \
-            #   --fail-with-body
-
             if [ $? -eq 0 ]; then
-              echo "✅ Successfully published version $version"
+              echo "Successfully republished $api_name v$version"
             else
-              echo "⚠️ Uploaded but failed to publish $version"
+              echo "Upload succeeded, but republish failed for $version"
             fi
           else
-            echo "❌ Failed to upload version $version of $api_name"
+            echo "Failed to upload spec for $api_name v$version"
           fi
 
-          echo "---"
+          echo "------------------------------"
         done
