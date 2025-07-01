@@ -119,12 +119,12 @@ jobs:
           if [ $? -eq 0 ]; then
             echo "✅ Successfully uploaded $api_name v$version to SwaggerHub"
 
-            curl -X PUT \
-              "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name/$version/settings/lifecycle" \
-              -H "Authorization: $SWAGGERHUB_API_KEY" \
-              -H "Content-Type: application/json" \
-              -d '{"published": true, "visibility": "public"}' \
-              --fail-with-body
+            # curl -X PUT \
+            #   "https://api.swaggerhub.com/apis/$SWAGGERHUB_OWNER/$api_name/$version/settings/lifecycle" \
+            #   -H "Authorization: $SWAGGERHUB_API_KEY" \
+            #   -H "Content-Type: application/json" \
+            #   -d '{"published": true, "visibility": "public"}' \
+            #   --fail-with-body
 
             if [ $? -eq 0 ]; then
               echo "✅ Successfully published version $version"
