@@ -102,13 +102,29 @@ paths:
         schema:
           type: string
       responses:
+        "200":
+          description: Success
         "400":
           description: Bad Request
         "401":
           description: Unauthorized
-        "200":
-          description: Success
       x-internal: true
+    delete:
+      tags:
+      - admins
+      summary: Your DELETE endpoint
+      operationId: delete-inventory-id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "2XX":
+          description: Success
 components:
   schemas:
     InventoryItem:
